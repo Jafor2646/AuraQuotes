@@ -377,8 +377,22 @@ class VectorRAGSystem:
     def get_contextual_embeddings(self, user_message: str, conversation_history: List[str]) -> Dict[str, Any]:
         """Create contextual embeddings from user message and history"""
         try:
+            # Handle both string and dict formats in conversation history
+            context_window = []
+            if conversation_history:
+                for item in conversation_history[-3:]:
+                    if isinstance(item, dict):
+                        # Extract message text from dictionary
+                        text = item.get('message', '') or item.get('content', '') or str(item)
+                    elif isinstance(item, str):
+                        text = item
+                    else:
+                        text = str(item)
+                    
+                    if text.strip():  # Only add non-empty messages
+                        context_window.append(text.strip())
+            
             # Combine current message with recent history
-            context_window = conversation_history[-3:] if conversation_history else []
             full_context = " ".join(context_window + [user_message])
             
             # Create embedding

@@ -287,14 +287,22 @@ class AgenticAIAgent:
         detected_mood = mood_analysis.get("category", "general")
         confidence = mood_analysis.get("confidence", 0)
         
-        # Invoke navigation and quotes for specific moods
+        # Always invoke navigation (provide default route if needed)
+        tools_to_invoke["quote_navigator"] = {
+            "mood": detected_mood,
+            "confidence": confidence
+        }
+        
+        # Invoke quotes for specific moods or general quotes for others
         if detected_mood in ["motivational", "romantic", "funny", "inspirational"] and confidence > 0.3:
-            tools_to_invoke["quote_navigator"] = {
-                "mood": detected_mood,
-                "confidence": confidence
-            }
             tools_to_invoke["quote_fetcher"] = {
                 "category": detected_mood,
+                "count": 3
+            }
+        else:
+            # For low confidence or general mood, still provide general quotes
+            tools_to_invoke["quote_fetcher"] = {
+                "category": "general",
                 "count": 3
             }
         
@@ -607,18 +615,26 @@ Respond with JSON only:
     async def navigate_to_quotes(self, mood: str, confidence: float) -> Dict[str, Any]:
         """Navigate to appropriate quote section"""
         page_mapping = {
-            "motivational": "/quotes/motivational",
-            "romantic": "/quotes/romantic", 
-            "funny": "/quotes/funny",
-            "inspirational": "/quotes/inspirational",
-            "general": "/quotes"
+            "motivational": "motivational",
+            "romantic": "romantic", 
+            "funny": "funny",
+            "inspirational": "inspirational",
+            "general": "motivational",  # Default to motivational for general
+            "sad": "inspirational",      # Map sad to inspirational
+            "happy": "funny",           # Map happy to funny
+            "love": "romantic",         # Map love to romantic
+            "work": "motivational",     # Map work to motivational
+            "life": "inspirational"     # Map life to inspirational
         }
         
+        # Get the appropriate category, default to motivational
+        category = page_mapping.get(mood.lower(), "motivational")
+        
         return {
-            "recommended_page": page_mapping.get(mood, "/quotes"),
-            "category": mood,
+            "recommended_page": f"/quotes/{category}",
+            "category": category,
             "confidence": confidence,
-            "navigation_reasoning": f"Based on {mood} mood with {confidence:.2f} confidence"
+            "navigation_reasoning": f"Based on {mood} mood with {confidence:.2f} confidence, redirecting to {category} quotes"
         }
     
     async def fetch_relevant_quotes(self, category: str, count: int = 3) -> Dict[str, Any]:
