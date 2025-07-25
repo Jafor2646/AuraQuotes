@@ -42,6 +42,39 @@ async def chat_endpoint(request: ChatRequest):
         print(f"Chat processing error: {e}")
         raise HTTPException(status_code=500, detail=f"Chat processing error: {str(e)}")
 
+@router.post("/feedback")
+async def provide_feedback(
+    message: str,
+    response: str,
+    feedback: str,
+    session_id: str = None,
+    is_correction: bool = False
+):
+    """Provide feedback to help the AI learn from mistakes"""
+    try:
+        result = await ai_agent.learn_from_feedback(
+            message=message,
+            response=response,
+            feedback=feedback,
+            session_id=session_id,
+            is_correction=is_correction
+        )
+        
+        return {
+            "success": True,
+            "data": result
+        }
+    except Exception as e:
+        print(f"Feedback processing error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "data": {
+                "status": "error",
+                "message": "Failed to process feedback"
+            }
+        }
+
 @router.get("/history/{session_id}")
 async def get_chat_history_endpoint(session_id: str):
     """Get chat history for a session with enhanced context"""
