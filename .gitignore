@@ -46,6 +46,12 @@ frontend/.env*
 backend/database.db
 backend/*.db
 
+# RAG and Vector Database
+backend/rag_database/
+rag_database/
+*.chroma
+chroma.sqlite3
+
 # IDE
 .vscode/
 .idea/

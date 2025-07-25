@@ -79,6 +79,48 @@ AuraQuotes is an intelligent quote platform featuring an **Enhanced RAG (Retriev
    cd backend
    pip install -r requirements.txt
    
+   # First-time setup: Initialize RAG database
+   cd ..
+   python init_rag.py
+   ```
+
+4. **Start the enhanced backend**
+   ```bash
+   # From project root
+   python run_system.py
+   ```
+
+5. **Set up the frontend**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+## 📊 RAG Database & Context
+
+### Vector Database
+The **RAG database** (`backend/rag_database/`) contains:
+- **Vector embeddings** of 120+ training conversations
+- **Semantic indices** for contextual retrieval
+- **Mistake learning** patterns and corrections
+- **Quality scoring** data for responses
+
+**Important**: This folder is **excluded from Git** (~3MB+ size).
+
+### Context & Memory Features
+- **📝 Full Chat History**: AI remembers entire conversation
+- **🔍 Semantic Context**: Uses vector similarity for relevant context
+- **🧠 Mood Progression**: Tracks emotional journey across messages
+- **📊 Topic Tracking**: Identifies conversation themes (work, relationships, etc.)
+- **🎯 Contextual Responses**: Responses consider previous exchanges
+- **💡 Learning from Feedback**: Corrections improve future responses
+
+### For New Deployments:
+1. Run `python init_rag.py` to initialize vector database
+2. System automatically trains with 120+ diverse prompts
+3. Chat context and learning activate immediately
+   
    # Create environment file
    cp .env.example .env
    # Edit .env if needed (default settings work for most setups)

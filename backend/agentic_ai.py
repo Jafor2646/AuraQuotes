@@ -158,14 +158,34 @@ class AgenticAIAgent:
             await self.rag_agent.initialize_and_train()
             self.rag_initialized = True
         
-        # Step 2: Enhanced mood analysis with RAG context
+        # Step 2: Enhanced mood analysis with comprehensive chat context
         conversation_history = self._get_conversation_context(session_id).get("messages", [])
+        
+        # Format conversation history for better context understanding
+        formatted_history = []
+        for msg in conversation_history[-5:]:  # Get last 5 exchanges for context
+            formatted_history.append({
+                "user_message": msg.get("user_message", ""),
+                "agent_response": msg.get("agent_response", ""),
+                "mood_detected": msg.get("mood_analysis", {}).get("category", "unknown"),
+                "timestamp": msg.get("timestamp", "")
+            })
+        
+        # Enhanced RAG retrieval with formatted context
         rag_context = await self.rag_agent.enhanced_retrieval(
             query=message,
-            context=conversation_history
+            context=formatted_history  # Pass formatted history instead of raw messages
         )
         
-        mood_analysis = await self.tools["mood_analyzer"].func(message, self._get_conversation_context(session_id))
+        # Pass full conversation context to mood analyzer
+        enhanced_context = {
+            "messages": formatted_history,
+            "session_memory": self._get_conversation_context(session_id),
+            "previous_moods": [msg.get("mood_analysis", {}) for msg in conversation_history[-3:]],
+            "conversation_flow": self._analyze_conversation_flow(formatted_history)
+        }
+        
+        mood_analysis = await self.tools["mood_analyzer"].func(message, enhanced_context)
         
         # Enhance mood analysis with RAG insights
         if rag_context.get("similar_conversations"):
@@ -337,7 +357,31 @@ class AgenticAIAgent:
         
         # Enhanced conversation context
         conversation_history = context.get("messages", [])[-3:] if context else []
-        history_text = "\n".join([f"{msg.get('role', 'user')}: {msg.get('content', '')}" for msg in conversation_history])
+        conversation_flow = context.get("conversation_flow", {})
+        previous_moods = context.get("previous_moods", [])
+        
+        # Format history with more context
+        history_text = ""
+        if conversation_history:
+            history_text = "RECENT CONVERSATION:\n"
+            for i, msg in enumerate(conversation_history):
+                user_msg = msg.get('user_message', '')[:100]  # Limit length
+                agent_response = msg.get('agent_response', '')[:100]
+                mood = msg.get('mood_detected', 'unknown')
+                history_text += f"Exchange {i+1}:\n  User: {user_msg}\n  AI: {agent_response}\n  Mood: {mood}\n\n"
+        
+        # Add conversation flow insights
+        flow_context = ""
+        if conversation_flow:
+            topics = conversation_flow.get("topics", [])
+            mood_progression = conversation_flow.get("mood_progression", [])
+            flow_context = f"""
+CONVERSATION CONTEXT:
+- Stage: {conversation_flow.get('stage', 'new')}
+- Topics discussed: {', '.join(topics) if topics else 'none yet'}
+- Mood progression: {' → '.join(mood_progression[-3:]) if mood_progression else 'first interaction'}
+- Recent topics: {', '.join(conversation_flow.get('recent_topics', [])) if conversation_flow.get('recent_topics') else 'none'}
+"""
         
         # Use enhanced prompt with better context and examples
         prompt = f"""You are an expert emotional intelligence AI specializing in mood detection for personalized quote recommendations.
@@ -380,6 +424,8 @@ USER PATTERNS:
 
 CONVERSATION HISTORY:
 {history_text}
+
+{flow_context}
 
 CURRENT MESSAGE TO ANALYZE: "{message}"
 
@@ -994,6 +1040,46 @@ Generate a response that feels like talking to an emotionally intelligent friend
     
     # ============ HELPER METHODS ============
     
+    def _analyze_conversation_flow(self, formatted_history: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze conversation flow for better context understanding"""
+        if not formatted_history:
+            return {"stage": "new", "topics": [], "mood_progression": []}
+        
+        # Extract topics and mood progression
+        topics = []
+        mood_progression = []
+        
+        for msg in formatted_history:
+            user_msg = msg.get("user_message", "").lower()
+            mood = msg.get("mood_detected", "unknown")
+            
+            # Extract key topics from user messages
+            if any(word in user_msg for word in ["work", "job", "career", "office"]):
+                topics.append("work")
+            if any(word in user_msg for word in ["relationship", "love", "partner", "boyfriend", "girlfriend"]):
+                topics.append("relationships")
+            if any(word in user_msg for word in ["sad", "depressed", "down", "unhappy"]):
+                topics.append("emotional_support")
+            if any(word in user_msg for word in ["goal", "achieve", "motivation", "success"]):
+                topics.append("motivation")
+                
+            mood_progression.append(mood)
+        
+        # Determine conversation stage
+        stage = "new"
+        if len(formatted_history) > 5:
+            stage = "established"
+        elif len(formatted_history) > 2:
+            stage = "developing"
+        
+        return {
+            "stage": stage,
+            "topics": list(set(topics)),
+            "mood_progression": mood_progression,
+            "conversation_length": len(formatted_history),
+            "recent_topics": topics[-3:] if len(topics) > 3 else topics
+        }
+
     def _get_conversation_context(self, session_id: str) -> Dict[str, Any]:
         """Get conversation context for session"""
         return self.session_memory.get(session_id, {})
